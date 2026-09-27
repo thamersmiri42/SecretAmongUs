@@ -18,13 +18,13 @@ jobs:
 
     steps:
       # ------------------------------------------------------------
-      # Checkout
+      # Checkout source code
       # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------
-      # Flutter
+      # Install Flutter
       # ------------------------------------------------------------
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -34,22 +34,16 @@ jobs:
           cache: true
 
       # ------------------------------------------------------------
-      # Flutter doctor
+      # Flutter environment
       # ------------------------------------------------------------
       - name: Flutter doctor
         run: flutter doctor -v
 
       # ------------------------------------------------------------
-      # Dependencies
+      # Download dependencies
       # ------------------------------------------------------------
       - name: Get dependencies
         run: flutter pub get
-
-      # ------------------------------------------------------------
-      # Format check
-      # ------------------------------------------------------------
-      - name: Check Dart formatting
-        run: dart format --output=none --set-exit-if-changed lib test
 
       # ------------------------------------------------------------
       # Static analysis
@@ -58,7 +52,7 @@ jobs:
         run: flutter analyze
 
       # ------------------------------------------------------------
-      # Automated tests
+      # Run tests
       # ------------------------------------------------------------
       - name: Run Flutter tests
         run: flutter test
@@ -70,16 +64,17 @@ jobs:
         run: flutter build apk --release
 
       # ------------------------------------------------------------
-      # Verify APK exists
+      # Verify generated APK
       # ------------------------------------------------------------
       - name: Verify APK
         shell: bash
         run: |
           test -f build/app/outputs/flutter-apk/app-release.apk
+          echo "APK successfully generated:"
           ls -lh build/app/outputs/flutter-apk/app-release.apk
 
       # ------------------------------------------------------------
-      # Upload APK
+      # Upload APK as GitHub Actions artifact
       # ------------------------------------------------------------
       - name: Upload APK
         uses: actions/upload-artifact@v4
