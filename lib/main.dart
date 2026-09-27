@@ -126,7 +126,7 @@ class L10n {
   String get advancedRoles => ar ? 'الأدوار المتقدمة' : fr ? 'Rôles avancés' : 'Advanced Roles';
   String get enabled => ar ? 'مفعّل' : fr ? 'Activé' : 'Enabled';
   String get disabled => ar ? 'معطّل' : fr ? 'Désactivé' : 'Disabled';
-  String get language => ar ? 'اللغة' : fr ? 'Langue' : 'Language';
+  String get languageLabel => ar ? 'اللغة' : fr ? 'Langue' : 'Language';
   String get darkMode => ar ? 'الوضع الليلي' : fr ? 'Mode sombre' : 'Dark Mode';
   String get sounds => ar ? 'الأصوات' : fr ? 'Sons' : 'Sounds';
   String get customWords => ar ? 'كلمات مخصصة' : fr ? 'Mots personnalisés' : 'Custom Words';
@@ -248,16 +248,6 @@ class L10n {
     };
     final values = map[value] ?? map['general']!;
     return values[language.index];
-  }
-}
-
-extension _LanguageIndex on AppLanguage {
-  int get index {
-    switch (this) {
-      case AppLanguage.arabic: return 0;
-      case AppLanguage.french: return 1;
-      case AppLanguage.english: return 2;
-    }
   }
 }
 
@@ -1152,7 +1142,7 @@ class _SecretAmongUsAppState extends State<SecretAmongUsApp> {
           borderSide: BorderSide.none,
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: dark ? SAUColors.panel : Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
@@ -1523,7 +1513,7 @@ class _SetupScreenState extends State<SetupScreen> {
       case RoleType.lovers: return Icons.favorite_rounded;
       case RoleType.meme: return Icons.pan_tool_alt_rounded;
       case RoleType.revenger: return Icons.gavel_rounded;
-      case RoleType.duelist: return Icons.swords_rounded;
+      case RoleType.duelist: return Icons.compare_arrows_rounded;
       case RoleType.ghost: return Icons.blur_on_rounded;
       case RoleType.falafel: return Icons.lunch_dining_rounded;
       case RoleType.boomerang: return Icons.sync_rounded;
@@ -1768,7 +1758,7 @@ class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderSt
       case RoleType.lovers: return Icons.favorite_rounded;
       case RoleType.meme: return Icons.pan_tool_alt_rounded;
       case RoleType.revenger: return Icons.gavel_rounded;
-      case RoleType.duelist: return Icons.swords_rounded;
+      case RoleType.duelist: return Icons.compare_arrows_rounded;
       case RoleType.ghost: return Icons.blur_on_rounded;
       case RoleType.falafel: return Icons.lunch_dining_rounded;
       case RoleType.boomerang: return Icons.sync_rounded;
@@ -2274,7 +2264,7 @@ class RoleGuideScreen extends StatelessWidget {
       case RoleType.lovers: return Icons.favorite_rounded;
       case RoleType.meme: return Icons.pan_tool_alt_rounded;
       case RoleType.revenger: return Icons.gavel_rounded;
-      case RoleType.duelist: return Icons.swords_rounded;
+      case RoleType.duelist: return Icons.compare_arrows_rounded;
       case RoleType.ghost: return Icons.blur_on_rounded;
       case RoleType.falafel: return Icons.lunch_dining_rounded;
       case RoleType.boomerang: return Icons.sync_rounded;
@@ -2347,7 +2337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(l10n.language, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          Text(l10n.languageLabel, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           SegmentedButton<AppLanguage>(
             segments: const [
