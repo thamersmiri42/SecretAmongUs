@@ -17,14 +17,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ------------------------------------------------------------
-      # Checkout source code
+      # Checkout repository
       # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------
-      # Install Flutter
+      # Setup Flutter
       # ------------------------------------------------------------
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -34,19 +35,40 @@ jobs:
           cache: true
 
       # ------------------------------------------------------------
-      # Flutter environment
+      # Flutter information
       # ------------------------------------------------------------
       - name: Flutter doctor
         run: flutter doctor -v
 
       # ------------------------------------------------------------
-      # Download dependencies
+      # Generate the Android project
+      #
+      # The repository contains the Flutter/Dart application,
+      # but Android Gradle files are not committed.
+      #
+      # This creates:
+      # android/
+      # android/app/
+      # android/gradle/
+      # AndroidManifest.xml
+      # Gradle configuration
+      # ------------------------------------------------------------
+      - name: Generate Android project
+        run: |
+          flutter create \
+            --platforms=android \
+            --project-name secret_among_us \
+            --org com.secretamongus \
+            .
+
+      # ------------------------------------------------------------
+      # Get dependencies
       # ------------------------------------------------------------
       - name: Get dependencies
         run: flutter pub get
 
       # ------------------------------------------------------------
-      # Static analysis
+      # Analyze Dart code
       # ------------------------------------------------------------
       - name: Analyze
         run: flutter analyze
@@ -64,17 +86,21 @@ jobs:
         run: flutter build apk --release
 
       # ------------------------------------------------------------
-      # Verify generated APK
+      # Verify APK
       # ------------------------------------------------------------
       - name: Verify APK
         shell: bash
         run: |
           test -f build/app/outputs/flutter-apk/app-release.apk
-          echo "APK successfully generated:"
+
+          echo "========================================"
+          echo "APK BUILD SUCCESSFUL"
+          echo "========================================"
+
           ls -lh build/app/outputs/flutter-apk/app-release.apk
 
       # ------------------------------------------------------------
-      # Upload APK as GitHub Actions artifact
+      # Upload APK
       # ------------------------------------------------------------
       - name: Upload APK
         uses: actions/upload-artifact@v4
