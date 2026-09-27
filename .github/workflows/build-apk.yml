@@ -3,24 +3,33 @@ name: Build Secret Among Us APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.5'
-          channel: 'stable'
+          channel: stable
           cache: true
-      - name: Install dependencies
+
+      - name: Create Android project files
+        run: flutter create --platforms=android --project-name secret_among_us .
+
+      - name: Get dependencies
         run: flutter pub get
+
       - name: Build APK
         run: flutter build apk --release
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
