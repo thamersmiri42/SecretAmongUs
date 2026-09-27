@@ -1,28 +1,64 @@
-name: secret_among_us
+name: Build Secret Among Us APK
 
-description: Secret Among Us - offline pass-and-play social deduction game.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-publish_to: "none"
+jobs:
+  build:
+    name: Analyze, Test and Build APK
+    runs-on: ubuntu-latest
 
-version: 1.0.0+1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-environment:
-  sdk: ">=3.5.0 <4.0.0"
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
 
-dependencies:
-  flutter:
-    sdk: flutter
+      - name: Flutter doctor
+        run: flutter doctor -v
 
-  shared_preferences: ^2.3.2
+      - name: Generate Android project
+        run: |
+          flutter create \
+            --platforms=android \
+            --project-name secret_among_us \
+            --org com.secretamongus \
+            .
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
+      - name: Get dependencies
+        run: flutter pub get
 
-  flutter_lints: ^4.0.0
+      - name: Analyze
+        run: flutter analyze
 
-flutter:
-  uses-material-design: true
+      - name: Run Flutter tests
+        run: flutter test
 
-  assets:
-    - secret_among_us_logo.png
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          test -f build/app/outputs/flutter-apk/app-release.apk
+          echo "========================================"
+          echo "APK BUILD SUCCESSFUL"
+          echo "========================================"
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecretAmongUs-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
