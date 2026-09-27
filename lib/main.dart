@@ -1332,15 +1332,28 @@ class _SetupScreenState extends State<SetupScreen> {
     _resizeControllers(5);
   }
 
-  @override
+   @override
   void dispose() {
-    for (final c in controllers) c.dispose();
+    for (final c in controllers) {
+      c.dispose();
+    }
+
     super.dispose();
   }
 
   void _resizeControllers(int count) {
-    while (controllers.length < count) controllers.add(TextEditingController(text: _defaultName(controllers.length)));
-    while (controllers.length > count) controllers.removeLast().dispose();
+    while (controllers.length < count) {
+      controllers.add(
+        TextEditingController(
+          text: _defaultName(controllers.length),
+        ),
+      );
+    }
+
+    while (controllers.length > count) {
+      controllers.removeLast().dispose();
+    }
+
     setState(() {});
   }
 
