@@ -110,7 +110,7 @@ class L10n {
   String get reveal => ar ? 'اكشف بطاقتي' : fr ? 'Révéler ma carte' : 'Reveal My Card';
   String get hide => ar ? 'أخفِ البطاقة' : fr ? 'Masquer' : 'Hide Card';
   String get passPhone => ar ? 'مرّر الهاتف' : fr ? 'Passez le téléphone' : 'Pass the Phone';
-  String get readyForNext => ar ? 'أنا جاهز — افتح بطاقتي' : fr ? 'Je suis prêt — ouvrir ma carte' : 'I'm ready — show my card';
+  String get readyForNext => ar ? 'أنا جاهز — افتح بطاقتي' : fr ? 'Je suis prêt — ouvrir ma carte' : "I'm ready — show my card";
   String get handPhoneTo => ar ? 'سلّم الهاتف إلى' : fr ? 'Passez le téléphone à' : 'Hand the phone to';
   String get clue => ar ? 'جولة الوصف' : fr ? 'Tour des indices' : 'Clue Round';
   String get discussion => ar ? 'النقاش' : fr ? 'Discussion' : 'Discussion';
@@ -1348,13 +1348,24 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   void dispose() {
-    for (final c in controllers) c.dispose();
+    for (final c in controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _resizeControllers(int count) {
-    while (controllers.length < count) controllers.add(TextEditingController(text: _defaultName(controllers.length)));
-    while (controllers.length > count) controllers.removeLast().dispose();
+    while (controllers.length < count) {
+      controllers.add(
+        TextEditingController(
+          text: _defaultName(controllers.length),
+        ),
+      );
+    }
+
+    while (controllers.length > count) {
+      controllers.removeLast().dispose();
+    }
     setState(() {});
   }
 
