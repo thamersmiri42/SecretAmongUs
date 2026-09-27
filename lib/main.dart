@@ -116,7 +116,7 @@ void showSettings(BuildContext c,AppState a){
         DropdownMenuItem(value:'en',child:Text('English')),DropdownMenuItem(value:'fr',child:Text('Français')),DropdownMenuItem(value:'ar',child:Text('العربية'))
       ],onChanged:(v){if(v!=null){a.changeLocale(Locale(v));set((){});Navigator.pop(c);}}),
       SwitchListTile(title:Text(a.t('theme')),subtitle:Text(a.dark?a.t('night'):a.t('light')),value:a.dark,onChanged:(v){a.changeTheme(v);set((){});}),
-    ])));
+    ]))));
 }
 
 class Setup extends StatefulWidget { final AppState app; const Setup({super.key,required this.app}); @override State<Setup> createState()=>_SetupState(); }
@@ -218,7 +218,7 @@ class _RevealState extends State<Reveal>{
         FilledButton(onPressed:shown?()=>setState(()=>shown=false):null,child:Padding(padding:const EdgeInsets.all(13),child:Text(shown?a.t('hide'):a.t('reveal')))),
         const SizedBox(height:12),
         if(shown)OutlinedButton(onPressed:next,child:Text(i+1<widget.names.length?a.t('next'):a.t('vote'))),
-      ]))));
+      ])))));
   }
   void next() {
     if (i + 1 < widget.names.length) {
@@ -295,7 +295,7 @@ class _VotingState extends State<Voting>{
    color:suspect==j?Colors.amber.withOpacity(.18):null,
    child:ListTile(title:Text(widget.names[j]),leading:CircleAvatar(child:Text('${j+1}')),trailing:suspect==j?const Icon(Icons.check):null,onTap:()=>setState(()=>suspect=j)))))),
   FilledButton(onPressed:suspect==null?null:submit,child:Padding(padding:const EdgeInsets.all(14),child:Text(voter+1<widget.names.length?a.t('next'):a.t('result'))))
- ])));
+ ]))));
  void submit() {
     votes[voter] = suspect!;
     if (voter + 1 < widget.names.length) {
@@ -325,10 +325,12 @@ class Result extends StatelessWidget{
  final AppState app; final List<String> names; final List<Role> roles; final Map<int,int> votes; final String citizenWord,spyWord;
  const Result({super.key,required this.app,required this.names,required this.roles,required this.votes,required this.citizenWord,required this.spyWord});
  @override Widget build(BuildContext context){
-  final counts=<int,int>{}; for(final v in votes.values)counts[v]=(counts[v]??0)+1;
+  final counts=<int,int>{};
+  for (final v in votes.values) {
+    counts[v]=(counts[v]??0)+1;
+  }
   final maxVotes=counts.values.isEmpty?0:counts.values.reduce(max);
   final target=counts.entries.firstWhere((e)=>e.value==maxVotes,orElse:()=>const MapEntry(0,0)).key;
-  final winner=roles[target]==Role.undercover||roles[target]==Role.white?'undercover':'citizens';
   return Directionality(textDirection:app.locale.languageCode=='ar'?TextDirection.rtl:TextDirection.ltr,child:Scaffold(
    body:SafeArea(child:Padding(padding:const EdgeInsets.all(22),child:Column(children:[
     const Spacer(),const Icon(Icons.auto_awesome,size:70,color:Colors.amber),const SizedBox(height:18),
@@ -340,16 +342,16 @@ class Result extends StatelessWidget{
       const Divider(height:30),Text('$citizenWord  •  $spyWord',style:const TextStyle(fontSize:18))
     ]))),
     const Spacer(),FilledButton.icon(onPressed:()=>Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Home(app:app)),(_)=>false),icon:const Icon(Icons.replay),label:Padding(padding:const EdgeInsets.all(14),child:Text(app.t('again'))))
-   ]))));
+   ])))));
  }
 }
 
 class Roles extends StatelessWidget{
  final AppState app; const Roles({super.key,required this.app});
- @override Widget build(BuildContext c)=>Directionality(textDirection:app.locale.languageCode=='ar'?TextDirection.rtl:TextDirection.ltr,child:Scaffold(
+ @override Widget build(BuildContext context)=>Directionality(textDirection:app.locale.languageCode=='ar'?TextDirection.rtl:TextDirection.ltr,child:Scaffold(
  appBar:AppBar(title:Text(app.t('roles'))),body:ListView(padding:const EdgeInsets.all(18),children:[
   for(final r in Role.values)Card(child:ListTile(leading:CircleAvatar(backgroundColor:roleColor(r),child:Icon(roleIcon(r),color:Colors.white)),title:Text(roleName(r,app),style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text(desc(r,app))))
- ]));
+ ])));
 }
 String desc(Role r, AppState a) {
   if (a.locale.languageCode == 'ar') {
