@@ -199,7 +199,7 @@ class L10n {
       case RoleType.twin:
         return ar ? 'يحصل على كلمة المتخفي نفسها دون معرفة التوأم.' : fr ? 'Partage le mot infiltré sans connaître son jumeau.' : 'Shares the Undercover word without knowing the twin.';
       case RoleType.goddess:
-        return ar ? 'تحسم تعادل الأصوات حتى بعد إقصائها.' : fr ? 'Tranche les égalités, même après son élimination.' : 'Breaks vote ties even after being eliminated.';
+        return ar ? 'صوتها يُحسب بصوتين؛ استخدم نفوذها لكسر التعادل.' : fr ? 'Son vote compte double pour casser les égalités.' : 'Her vote counts double to break ties.';
       case RoleType.lovers:
         return ar ? 'مرتبط بلاعب آخر. إذا أُقصي أحدهما، يُقصى الآخر.' : fr ? 'Lié à un autre joueur. Si l’un sort, l’autre sort.' : 'Linked to another player. If one is eliminated, the other follows.';
       case RoleType.meme:
@@ -268,6 +268,8 @@ class WordPair {
 class Player {
   String name;
   RoleType role;
+  RoleType coreRole;
+  RoleType? specialRole;
   TeamType team;
   String word;
   bool active;
@@ -280,10 +282,14 @@ class Player {
   bool boomerangSpent;
   bool revengerUsed;
   bool firstEliminationBonus;
+  String? knownPlayerName;
+  TeamType? knownPlayerTeam;
 
   Player({
     required this.name,
     this.role = RoleType.civilian,
+    this.coreRole = RoleType.civilian,
+    this.specialRole,
     this.team = TeamType.civilian,
     this.word = '',
     this.active = true,
@@ -296,10 +302,13 @@ class Player {
     this.boomerangSpent = false,
     this.revengerUsed = false,
     this.firstEliminationBonus = false,
+    this.knownPlayerName,
+    this.knownPlayerTeam,
   });
 
-  bool get isCore => role == RoleType.civilian || role == RoleType.undercover || role == RoleType.mrWhite;
-  bool get isInfiltrator => role == RoleType.undercover || role == RoleType.mrWhite;
+  bool get isCore => coreRole == RoleType.civilian || coreRole == RoleType.undercover || coreRole == RoleType.mrWhite;
+  bool get isInfiltrator => coreRole == RoleType.undercover || coreRole == RoleType.mrWhite;
+  bool get isMrWhite => coreRole == RoleType.mrWhite;
 }
 
 class SpecialConfig {
@@ -366,7 +375,7 @@ class GameSettings {
   Difficulty difficulty = Difficulty.medium;
   String category = 'general';
   bool anonymousVote = true;
-  bool revealRoles = true;
+  bool revealRoles = false;
   bool timedClues = false;
   bool timedDiscussion = false;
   bool useCustomWords = false;
@@ -624,7 +633,8 @@ class GameEngine extends ChangeNotifier {
     if (settings.undercoverCount < 1) return false;
     if (settings.civilianCount() < 1) return false;
     if (settings.undercoverCount + settings.mrWhiteCount >= players.length) return false;
-    if (settings.undercoverCount + settings.mrWhiteCount + settings.specials.specialCountForBalance() >= settings.civilianCount()) return false;
+    // Special roles are abilities, not extra factions. Keep the core team
+    // mathematically playable instead of subtracting every ability from civilians.
     if (settings.specials.lovers && players.length < 5) return false;
     if (settings.specials.revenger && players.length < 5) return false;
     if (settings.specials.duelists && players.length < 5) return false;
@@ -654,6 +664,8 @@ class GameEngine extends ChangeNotifier {
   void _resetPlayers() {
     for (final player in players) {
       player.role = RoleType.civilian;
+      player.coreRole = RoleType.civilian;
+      player.specialRole = null;
       player.team = TeamType.civilian;
       player.word = '';
       player.active = true;
@@ -666,6 +678,8 @@ class GameEngine extends ChangeNotifier {
       player.boomerangSpent = false;
       player.revengerUsed = false;
       player.firstEliminationBonus = false;
+      player.knownPlayerName = null;
+      player.knownPlayerTeam = null;
     }
     goddess = null;
     lovers = [];
@@ -691,96 +705,122 @@ class GameEngine extends ChangeNotifier {
     int cursor = 0;
     for (int i = 0; i < settings.undercoverCount; i++) {
       final player = players[indexes[cursor++]];
+      player.coreRole = RoleType.undercover;
       player.role = RoleType.undercover;
       player.team = TeamType.infiltrator;
       player.word = pair!.undercover;
     }
     for (int i = 0; i < settings.mrWhiteCount; i++) {
       final player = players[indexes[cursor++]];
+      player.coreRole = RoleType.mrWhite;
       player.role = RoleType.mrWhite;
       player.team = TeamType.infiltrator;
       player.word = '';
     }
     for (final player in players) {
-      if (player.role == RoleType.civilian) {
+      if (player.coreRole == RoleType.civilian) {
         player.word = pair!.civilian;
+        player.team = TeamType.civilian;
       }
     }
   }
 
-  void _assignSpecialRoles() {
-    final available = players.toList()..shuffle(random);
-    if (settings.specials.goddess) {
-      goddess = available.first;
-      _overlay(goddess!, RoleType.goddess);
-    }
-    if (settings.specials.guardian) {
-      final candidates = available.where((p) => p != goddess).toList();
-      if (candidates.isNotEmpty) {
-        guardian = candidates[random.nextInt(candidates.length)];
-        _overlay(guardian!, RoleType.guardian);
-      }
-    }
-    if (settings.specials.twin) {
-      final candidates = players.where((p) => p.role == RoleType.civilian).toList();
-      if (candidates.isNotEmpty) {
-        twin = candidates[random.nextInt(candidates.length)];
-        twin!.word = pair!.undercover;
-        _overlay(twin!, RoleType.twin, preserveTeam: true);
-      }
-    }
-    if (settings.specials.lovers && players.length >= 5) {
-      final candidates = players.toList()..shuffle(random);
-      lovers = candidates.take(2).toList();
-      // Lovers are overlays. Their underlying team and core role remain intact.
-    }
-    if (settings.specials.meme) {
-      memeTarget = players[random.nextInt(players.length)];
-    }
-    if (settings.specials.revenger && players.length >= 5) {
-      final candidates = players.where((p) => !lovers.contains(p)).toList();
-      if (candidates.isNotEmpty) _overlay(candidates[random.nextInt(candidates.length)], RoleType.revenger, preserveTeam: true);
-    }
-    if (settings.specials.duelists && players.length >= 5) {
-      final candidates = players.toList()..shuffle(random);
-      duelists = candidates.take(2).toList();
-    }
-    if (settings.specials.ghost) {
-      final candidates = players.where((p) => !lovers.contains(p)).toList();
-      if (candidates.isNotEmpty) _overlay(candidates[random.nextInt(candidates.length)], RoleType.ghost, preserveTeam: true);
-    }
-    if (settings.specials.falafel && players.length >= 4) {
-      falafelTarget = players[random.nextInt(players.length)];
-    }
-    if (settings.specials.boomerang) {
-      final candidates = players.where((p) => !lovers.contains(p)).toList();
-      if (candidates.isNotEmpty) _overlay(candidates[random.nextInt(candidates.length)], RoleType.boomerang, preserveTeam: true);
-    }
-    if (settings.specials.joyFool) {
-      final candidates = players.where((p) => !lovers.contains(p)).toList();
-      if (candidates.isNotEmpty) _overlay(candidates[random.nextInt(candidates.length)], RoleType.joyFool, preserveTeam: true);
-    }
-    if (settings.specials.joker) {
-      final candidates = players.where((p) => !lovers.contains(p)).toList();
-      if (candidates.isNotEmpty) _overlay(candidates[random.nextInt(candidates.length)], RoleType.joker, preserveTeam: true);
-    }
+  List<Player> _specialCandidates({bool civilianOnly = false, bool excludeSpecial = true}) {
+    return players.where((p) {
+      if (p.coreRole == RoleType.mrWhite) return false;
+      if (civilianOnly && p.coreRole != RoleType.civilian) return false;
+      if (excludeSpecial && p.specialRole != null) return false;
+      return true;
+    }).toList()..shuffle(random);
   }
 
-  void _overlay(Player player, RoleType special, {bool preserveTeam = true}) {
-    // A special role is an ability layer, not a replacement faction.
-    // For simplicity the visible role is special while the core team remains.
-    if (!preserveTeam) {
-      player.team = special == RoleType.joker || special == RoleType.joyFool ? TeamType.neutral : player.team;
-    }
+  void _giveSpecial(Player player, RoleType special) {
+    if (player.specialRole != null) return;
+    player.specialRole = special;
     player.role = special;
   }
 
-  RoleType underlyingRole(Player player) {
-    // The engine infers the core faction from the team and word state.
-    if (player.team == TeamType.civilian) return RoleType.civilian;
-    if (player.word.isEmpty) return RoleType.mrWhite;
-    return RoleType.undercover;
+  void _assignSpecialRoles() {
+    if (settings.specials.goddess) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) {
+        goddess = c.first;
+        _giveSpecial(goddess!, RoleType.goddess);
+      }
+    }
+    if (settings.specials.guardian) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) {
+        guardian = c.first;
+        _giveSpecial(guardian!, RoleType.guardian);
+        final targets = players.where((p) => p != guardian).toList()..shuffle(random);
+        if (targets.isNotEmpty) {
+          guardian!.knownPlayerName = targets.first.name;
+          guardian!.knownPlayerTeam = targets.first.team;
+        }
+      }
+    }
+    if (settings.specials.twin) {
+      final c = _specialCandidates(civilianOnly: true);
+      if (c.isNotEmpty) {
+        twin = c.first;
+        twin!.word = pair!.undercover;
+        _giveSpecial(twin!, RoleType.twin);
+      }
+    }
+    if (settings.specials.lovers && players.length >= 5) {
+      final c = _specialCandidates();
+      if (c.length >= 2) {
+        lovers = [c[0], c[1]];
+        _giveSpecial(c[0], RoleType.lovers);
+        _giveSpecial(c[1], RoleType.lovers);
+      }
+    }
+    if (settings.specials.meme) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) {
+        memeTarget = c.first;
+        _giveSpecial(memeTarget!, RoleType.meme);
+      }
+    }
+    if (settings.specials.revenger && players.length >= 5) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) _giveSpecial(c.first, RoleType.revenger);
+    }
+    if (settings.specials.duelists && players.length >= 5) {
+      final c = _specialCandidates();
+      if (c.length >= 2) {
+        duelists = [c[0], c[1]];
+        _giveSpecial(c[0], RoleType.duelist);
+        _giveSpecial(c[1], RoleType.duelist);
+      }
+    }
+    if (settings.specials.ghost) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) _giveSpecial(c.first, RoleType.ghost);
+    }
+    if (settings.specials.falafel && players.length >= 4) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) {
+        falafelTarget = c.first;
+        _giveSpecial(falafelTarget!, RoleType.falafel);
+      }
+    }
+    if (settings.specials.boomerang) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) _giveSpecial(c.first, RoleType.boomerang);
+    }
+    if (settings.specials.joyFool) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) _giveSpecial(c.first, RoleType.joyFool);
+    }
+    if (settings.specials.joker) {
+      final c = _specialCandidates();
+      if (c.isNotEmpty) _giveSpecial(c.first, RoleType.joker);
+    }
   }
+
+  RoleType underlyingRole(Player player) => player.coreRole;
 
   void finishReveal() {
     if (revealIndex < players.length - 1) {
@@ -793,7 +833,8 @@ class GameEngine extends ChangeNotifier {
 
   void _prepareRound() {
     clueIndex = 0;
-    memeTarget = settings.specials.meme ? activePlayers[random.nextInt(activePlayers.length)] : null;
+    final memeCandidates = players.where((p) => p.active && p.specialRole == RoleType.meme).toList();
+    memeTarget = memeCandidates.isEmpty ? null : memeCandidates.first;
     if (settings.specials.falafel) _applyFalafelEvent();
     phase = GamePhase.clues;
     notifyListeners();
@@ -801,11 +842,18 @@ class GameEngine extends ChangeNotifier {
 
   void _applyFalafelEvent() {
     if (activePlayers.length < 2) return;
-    final target = activePlayers[random.nextInt(activePlayers.length)];
+    final holder = players.where((p) => p.specialRole == RoleType.falafel && p.active).toList();
+    final targetPool = activePlayers;
+    final target = targetPool[random.nextInt(targetPool.length)];
     final protection = random.nextBool();
     target.protected = protection;
     target.sabotaged = !protection;
-    falafelTarget = target;
+    falafelTarget = holder.isNotEmpty ? holder.first : target;
+    lastMessage = language == AppLanguage.arabic
+        ? 'تأثير الفلافل فعّل تأثيرًا سريًا هذا الدور.'
+        : language == AppLanguage.french
+            ? 'Le pouvoir du Falafel a déclenché un effet secret.'
+            : 'Falafel power triggered a secret effect.';
   }
 
   void nextClue() {
@@ -814,6 +862,7 @@ class GameEngine extends ChangeNotifier {
       notifyListeners();
     } else {
       phase = GamePhase.discussion;
+      if (settings.timedDiscussion) startTimer(settings.discussionSeconds, () {});
       notifyListeners();
     }
   }
@@ -821,6 +870,7 @@ class GameEngine extends ChangeNotifier {
   void skipClue() => nextClue();
 
   void beginVoting() {
+    stopTimer();
     for (final p in players) {
       p.votesReceived = 0;
       p.hasVoted = false;
@@ -831,31 +881,23 @@ class GameEngine extends ChangeNotifier {
 
   bool castVote(Player voter, Player target) {
     if (!voter.active || voter.ghost || voter.hasVoted) return false;
-    if (!target.active) return false;
+    if (!target.active || target == voter) return false;
     voter.hasVoted = true;
-    target.votesReceived++;
+    target.votesReceived += voter.specialRole == RoleType.goddess ? 2 : 1;
     notifyListeners();
     return true;
   }
 
-  bool get allVotesCast {
-    return aliveForVoting.every((p) => p.hasVoted);
-  }
+  bool get allVotesCast => aliveForVoting.isNotEmpty && aliveForVoting.every((p) => p.hasVoted);
 
   Player? resolveVote() {
     if (!allVotesCast) return null;
     final candidates = aliveForVoting.toList();
     if (candidates.isEmpty) return null;
     final maxVotes = candidates.map((p) => p.votesReceived).reduce(max);
-    var tied = candidates.where((p) => p.votesReceived == maxVotes).toList();
-    if (tied.length > 1 && goddess != null) {
-      final goddessStillPresent = goddess!;
-      // Goddess decides through a dedicated UI; deterministic fallback uses
-      // the first tied candidate only if no explicit choice was provided.
-      lastMessage = '${l10n.roleName(RoleType.goddess)}: ${goddessStillPresent.name}';
-      tied = [tied.first];
-    }
-    if (tied.length > 1) tied.shuffle(random);
+    final tied = candidates.where((p) => p.votesReceived == maxVotes).toList()..shuffle(random);
+    // A Goddess gives the tie-breaker to the player carrying the role, but
+    // no one outside the private reveal needs to know who she is.
     final target = tied.first;
     return eliminate(target);
   }
@@ -865,35 +907,38 @@ class GameEngine extends ChangeNotifier {
     if (target.protected) {
       target.protected = false;
       lastMessage = arProtectionMessage();
+      phase = GamePhase.result;
+      notifyListeners();
       return target;
     }
     if (target.sabotaged) {
       target.sabotaged = false;
       lastMessage = arSabotageMessage();
     }
+
     target.active = false;
     lastEliminated = target;
     totalRounds++;
 
-    if (settings.specials.ghost || target.role == RoleType.ghost) {
-      if (target.role == RoleType.ghost || settings.specials.ghost) {
-        target.ghost = true;
-      }
+    final special = target.specialRole;
+    if (special == RoleType.ghost) target.ghost = true;
+
+    if (special == RoleType.joyFool && round == 1) {
+      target.score += 4;
+      target.firstEliminationBonus = true;
     }
 
-    if (settings.specials.joyFool && round == 1) {
-      if (target.role == RoleType.joyFool) {
-        target.score += 4;
-        target.firstEliminationBonus = true;
-      }
-    }
-
-    if (settings.specials.boomerang && target.role == RoleType.boomerang && !target.boomerangSpent) {
+    if (special == RoleType.boomerang && !target.boomerangSpent) {
       target.boomerangSpent = true;
-      _boomerang(target);
+      target.active = true;
+      lastMessage = arBoomerangMessage();
+      round++;
+      phase = GamePhase.result;
+      notifyListeners();
+      return target;
     }
 
-    if (settings.specials.revenger && target.role == RoleType.revenger && !target.revengerUsed) {
+    if (special == RoleType.revenger && !target.revengerUsed) {
       target.revengerUsed = true;
       phase = GamePhase.result;
       notifyListeners();
@@ -904,12 +949,12 @@ class GameEngine extends ChangeNotifier {
       final partner = lovers.firstWhere((p) => p != target, orElse: () => target);
       if (partner != target && partner.active) {
         partner.active = false;
-        partner.ghost = settings.specials.ghost;
+        if (settings.specials.ghost && partner.specialRole == RoleType.ghost) partner.ghost = true;
         lastMessage = '${target.name} ♥ ${partner.name}';
       }
     }
 
-    if (underlyingRole(target) == RoleType.mrWhite) {
+    if (target.coreRole == RoleType.mrWhite) {
       pendingMrWhite = target;
       phase = GamePhase.mrWhiteGuess;
       notifyListeners();
@@ -932,21 +977,10 @@ class GameEngine extends ChangeNotifier {
     return target;
   }
 
-  void _boomerang(Player target) {
-    for (final voter in players.where((p) => p.active)) {
-      if (voter.hasVoted && target.votesReceived > 0) {
-        voter.votesReceived++;
-      }
-    }
-    target.active = true;
-    target.votesReceived = 0;
-    lastMessage = arBoomerangMessage();
-  }
-
   void continueAfterResult() {
     if (phase == GamePhase.finished) return;
-    if (checkVictory() != null) {
-      final result = checkVictory()!;
+    final result = checkVictory();
+    if (result != null) {
       winner = result.winningTeam;
       finalReason = result.reason;
       phase = GamePhase.finished;
@@ -962,6 +996,8 @@ class GameEngine extends ChangeNotifier {
     for (final p in players) {
       p.hasVoted = false;
       p.votesReceived = 0;
+      p.protected = false;
+      p.sabotaged = false;
     }
   }
 
@@ -971,18 +1007,20 @@ class GameEngine extends ChangeNotifier {
     if (infiltrators == 0) {
       return const GameResult(winningTeam: TeamType.civilian, reason: 'All infiltrators eliminated.');
     }
-    if (infiltrators >= civilians && civilians > 0) {
-      return const GameResult(winningTeam: TeamType.infiltrator, reason: 'Infiltrators reached parity with Civilians.');
-    }
-    if (civilians == 0 && infiltrators > 0) {
+    if (civilians == 0) {
       return const GameResult(winningTeam: TeamType.infiltrator, reason: 'No Civilians remain.');
+    }
+    if (infiltrators >= civilians) {
+      return const GameResult(winningTeam: TeamType.infiltrator, reason: 'Infiltrators reached parity with Civilians.');
     }
     return null;
   }
 
   void submitMrWhiteGuess(String guess) {
     if (pendingMrWhite == null || pair == null) return;
-    mrWhiteGuessCorrect = guess.trim().toLowerCase() == pair!.civilian.trim().toLowerCase();
+    final normalizedGuess = guess.trim().toLowerCase();
+    final answer = pair!.civilian.trim().toLowerCase();
+    mrWhiteGuessCorrect = normalizedGuess == answer;
     if (mrWhiteGuessCorrect) {
       pendingMrWhite!.score += 6;
       winner = TeamType.infiltrator;
@@ -991,6 +1029,7 @@ class GameEngine extends ChangeNotifier {
       _awardScores(TeamType.infiltrator);
     } else {
       pendingMrWhite!.active = false;
+      pendingMrWhite = null;
       final result = checkVictory();
       if (result != null) {
         winner = result.winningTeam;
@@ -998,6 +1037,7 @@ class GameEngine extends ChangeNotifier {
         _awardScores(result.winningTeam);
         phase = GamePhase.finished;
       } else {
+        round++;
         phase = GamePhase.result;
       }
     }
@@ -1005,9 +1045,8 @@ class GameEngine extends ChangeNotifier {
   }
 
   void useRevenger(Player target) {
-    if (lastEliminated == null) return;
-    if (lastEliminated!.role != RoleType.revenger) return;
-    if (!target.active) return;
+    if (lastEliminated == null || lastEliminated!.specialRole != RoleType.revenger) return;
+    if (!target.active || target == lastEliminated) return;
     target.active = false;
     lastMessage = '${lastEliminated!.name} eliminated ${target.name}.';
     final result = checkVictory();
@@ -1017,6 +1056,7 @@ class GameEngine extends ChangeNotifier {
       phase = GamePhase.finished;
       _awardScores(result.winningTeam);
     } else {
+      round++;
       phase = GamePhase.result;
     }
     notifyListeners();
@@ -1025,15 +1065,16 @@ class GameEngine extends ChangeNotifier {
   void _awardScores(TeamType team) {
     for (final p in players) {
       if (team == TeamType.civilian && p.team == TeamType.civilian) p.score += 2;
-      if (team == TeamType.infiltrator && p.role == RoleType.undercover) p.score += 10;
-      if (team == TeamType.infiltrator && p.role == RoleType.mrWhite) p.score += 6;
+      if (team == TeamType.infiltrator && p.coreRole == RoleType.undercover) p.score += 10;
+      if (team == TeamType.infiltrator && p.coreRole == RoleType.mrWhite) p.score += 6;
+      if (team == TeamType.civilian && p.firstEliminationBonus) p.score += 4;
       sessionScores[p.name] = (sessionScores[p.name] ?? 0) + p.score;
     }
   }
 
-  String arProtectionMessage() => language == AppLanguage.arabic ? 'الحماية أنقذت اللاعب!' : language == AppLanguage.french ? 'La protection a sauvé le joueur !' : 'Protection saved the player!';
-  String arSabotageMessage() => language == AppLanguage.arabic ? 'التخريب فعّل تأثيرًا سلبيًا.' : language == AppLanguage.french ? 'Le sabotage a déclenché un effet négatif.' : 'Sabotage triggered a negative effect.';
-  String arBoomerangMessage() => language == AppLanguage.arabic ? 'البوميرانغ ارتد! اللاعب بقي في اللعبة.' : language == AppLanguage.french ? 'Boomerang ! Le joueur reste en jeu.' : 'Boomerang bounced! The player stays in the game.';
+  String arProtectionMessage() => language == AppLanguage.arabic ? '🛡️ الحماية أنقذت اللاعب. الجولة مستمرة.' : language == AppLanguage.french ? '🛡️ La protection a sauvé le joueur. La partie continue.' : '🛡️ Protection saved the player. The game continues.';
+  String arSabotageMessage() => language == AppLanguage.arabic ? '⚠️ تأثير التخريب فعّل نتيجة سرية.' : language == AppLanguage.french ? '⚠️ Le sabotage a déclenché un effet secret.' : '⚠️ Sabotage triggered a secret effect.';
+  String arBoomerangMessage() => language == AppLanguage.arabic ? '↩️ البوميرانغ ارتد! اللاعب بقي في اللعبة.' : language == AppLanguage.french ? '↩️ Boomerang ! Le joueur reste en jeu.' : '↩️ Boomerang bounced! The player stays in the game.';
 
   void setPhase(GamePhase value) {
     phase = value;
@@ -1176,101 +1217,73 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(child: _ambientBackground()),
-          SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ListView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 34),
-                  children: [
-                    Align(alignment: AlignmentDirectional.topEnd, child: _offlineBadge()),
-                    const SizedBox(height: 8),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: .92, end: 1),
-                      duration: const Duration(milliseconds: 700),
-                      curve: Curves.easeOutBack,
-                      builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
-                      child: _logo(),
-                    ),
-                    const SizedBox(height: 22),
-                    Text(
-                      l10n.appName,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: SAUColors.goldBright, fontSize: 40, height: 1, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      l10n.noInternet,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: SAUColors.muted, fontSize: 15, height: 1.4),
-                    ),
-                    const SizedBox(height: 28),
-                    _heroPanel(),
-                    const SizedBox(height: 18),
-                    PrimaryButton(
-                      icon: Icons.play_arrow_rounded,
-                      label: l10n.newGame,
-                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SetupScreen(engine: engine, language: language))),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: SecondaryButton(icon: Icons.menu_book_rounded, label: l10n.roleGuide, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RoleGuideScreen(language: language))))),
-                        const SizedBox(width: 12),
-                        Expanded(child: SecondaryButton(icon: Icons.settings_rounded, label: l10n.settings, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(language: language, onLanguage: onLanguage, onTheme: onTheme))))),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _coreInfo(),
-                  ],
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const SizedBox(height: 30),
+                _logo(),
+                const SizedBox(height: 30),
+                Text(
+                  l10n.appName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: SAUColors.goldBright,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  language == AppLanguage.arabic ? 'لعبة خداع اجتماعية • مرّر الهاتف • شكّ • صوّت • انتصر' : language == AppLanguage.french ? 'Déduction sociale • Passez le téléphone • Soupçonnez • Votez' : 'Social deduction • Pass the phone • Suspect • Vote • Survive',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: SAUColors.muted),
+                ),
+                const SizedBox(height: 42),
+                PrimaryButton(
+                  icon: Icons.play_arrow_rounded,
+                  label: l10n.newGame,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SetupScreen(engine: engine, language: language),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SecondaryButton(
+                  icon: Icons.menu_book_rounded,
+                  label: l10n.roleGuide,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RoleGuideScreen(language: language),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SecondaryButton(
+                  icon: Icons.settings_rounded,
+                  label: l10n.settings,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SettingsScreen(
+                        language: language,
+                        onLanguage: onLanguage,
+                        onTheme: onTheme,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _coreInfo(),
+              ],
             ),
           ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _ambientBackground() {
-    return DecoratedBox(
-      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [SAUColors.navy2, SAUColors.navy])),
-      child: Stack(children: [
-        Positioned(top: -110, right: -80, child: _glowOrb(250, SAUColors.gold)),
-        Positioned(top: 330, left: -140, child: _glowOrb(300, SAUColors.cyan)),
-      ]),
-    );
-  }
-
-  Widget _glowOrb(double size, Color color) {
-    return IgnorePointer(child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.035), boxShadow: [BoxShadow(color: color.withOpacity(.07), blurRadius: 90, spreadRadius: 25)])));
-  }
-
-  Widget _offlineBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: SAUColors.panel.withOpacity(.82), borderRadius: BorderRadius.circular(99), border: Border.all(color: SAUColors.green.withOpacity(.30))),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 7, height: 7, decoration: const BoxDecoration(color: SAUColors.green, shape: BoxShape.circle)),
-        const SizedBox(width: 7),
-        Text(l10n.noInternet, style: const TextStyle(color: SAUColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-      ]),
-    );
-  }
-
-  Widget _heroPanel() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [SAUColors.panel2, SAUColors.panel], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), border: Border.all(color: SAUColors.gold.withOpacity(.16)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(.22), blurRadius: 28, offset: const Offset(0, 12))]),
-      child: Row(children: [
-        Container(width: 52, height: 52, decoration: BoxDecoration(color: SAUColors.gold.withOpacity(.10), borderRadius: BorderRadius.circular(17), border: Border.all(color: SAUColors.gold.withOpacity(.22))), child: const Icon(Icons.groups_rounded, color: SAUColors.goldBright, size: 27)),
-        const SizedBox(width: 14),
-        Expanded(child: Text(localizedInstruction(language, 'مرّر الهاتف، اكشف دورك، ثم أخفِ البطاقة قبل تمريرها للاعب التالي.', 'Passez le téléphone, révélez votre rôle, puis masquez la carte avant de le passer au joueur suivant.', 'Pass the phone, reveal your role, then hide the card before handing it to the next player.'), style: const TextStyle(color: SAUColors.text, height: 1.45, fontSize: 14, fontWeight: FontWeight.w600))),
-      ]),
     );
   }
 
@@ -1281,7 +1294,6 @@ class HomeScreen extends StatelessWidget {
         height: 190,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(48),
-          border: Border.all(color: SAUColors.gold.withOpacity(.28), width: 1),
           boxShadow: [
             BoxShadow(
               color: SAUColors.gold.withOpacity(.22),
@@ -1910,7 +1922,13 @@ class _RevealScreenState extends State<RevealScreen>
 
   Widget _card() {
     final role = player.role;
-    final color = _roleColor(role);
+    // Never leak the hidden core faction through card color. Only Mr. White
+    // and an optional special ability get a distinct reveal color.
+    final color = player.coreRole == RoleType.mrWhite
+        ? SAUColors.purple
+        : player.specialRole != null
+            ? _roleColor(player.specialRole!)
+            : SAUColors.gold;
     return AnimatedBuilder(
       animation: flip,
       builder: (context, child) {
@@ -1980,23 +1998,28 @@ class _RevealScreenState extends State<RevealScreen>
   }
 
   Widget _front(Color color) {
-    final core = widget.engine.underlyingRole(player);
-    final displayRole = player.role;
-    final word = player.word.isEmpty ? '—' : player.word;
+    final special = player.specialRole;
+    final isMrWhite = player.coreRole == RoleType.mrWhite;
+    final title = isMrWhite
+        ? l10n.roleName(RoleType.mrWhite)
+        : special == null
+            ? (widget.language == AppLanguage.arabic ? 'كلمتك السرية' : widget.language == AppLanguage.french ? 'Votre mot secret' : 'Your Secret Word')
+            : l10n.roleName(special);
+    final word = player.word.isEmpty ? '???' : player.word;
+    final description = isMrWhite
+        ? l10n.roleDescription(RoleType.mrWhite)
+        : special == null
+            ? (widget.language == AppLanguage.arabic ? 'أنت لا تعرف فصيلك. استنتج من كلام الآخرين وحاول البقاء.' : widget.language == AppLanguage.french ? 'Vous ne connaissez pas votre camp. Déduisez-le grâce aux indices.' : 'You do not know your faction. Deduce it from the clues and survive.')
+            : l10n.roleDescription(special);
+
     return Container(
-      constraints: const BoxConstraints(maxWidth: 480, minHeight: 360),
-      padding: const EdgeInsets.all(30),
+      constraints: const BoxConstraints(maxWidth: 500, minHeight: 410),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(34),
-        gradient: const LinearGradient(
-          colors: [SAUColors.panel2, SAUColors.panel],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        borderRadius: BorderRadius.circular(36),
+        gradient: const LinearGradient(colors: [SAUColors.panel2, SAUColors.navy], begin: Alignment.topLeft, end: Alignment.bottomRight),
         border: Border.all(color: color, width: 2),
-        boxShadow: [
-          BoxShadow(color: color.withOpacity(.22), blurRadius: 34, spreadRadius: 2),
-        ],
+        boxShadow: [BoxShadow(color: color.withOpacity(.28), blurRadius: 42, spreadRadius: 2)],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -2004,45 +2027,35 @@ class _RevealScreenState extends State<RevealScreen>
           Container(
             width: 88,
             height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(.10),
-              border: Border.all(color: color.withOpacity(.55)),
-              boxShadow: [BoxShadow(color: color.withOpacity(.16), blurRadius: 22)],
-            ),
-            child: Icon(_roleIcon(displayRole), size: 48, color: color),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.10), border: Border.all(color: color.withOpacity(.55)), boxShadow: [BoxShadow(color: color.withOpacity(.16), blurRadius: 22)]),
+            child: Icon(isMrWhite ? _roleIcon(RoleType.mrWhite) : special != null ? _roleIcon(special) : Icons.visibility_off_rounded, size: 48, color: color),
           ),
           const SizedBox(height: 18),
-          Text(
-            l10n.roleName(displayRole),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: color),
-          ),
-          if (displayRole != core) ...[
-            const SizedBox(height: 7),
-            Text('Core: ${l10n.roleName(core)}', style: const TextStyle(color: SAUColors.muted)),
-          ],
-          const SizedBox(height: 24),
+          Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900, color: color)),
+          const SizedBox(height: 18),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              color: SAUColors.navy.withOpacity(.55),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: color.withOpacity(.20)),
-            ),
-            child: Text(
-              word,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900, color: SAUColors.text),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+            decoration: BoxDecoration(color: Colors.black.withOpacity(.22), borderRadius: BorderRadius.circular(22), border: Border.all(color: color.withOpacity(.22))),
+            child: Text(word, textAlign: TextAlign.center, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: SAUColors.text, letterSpacing: .5)),
           ),
           const SizedBox(height: 18),
-          Text(
-            l10n.roleDescription(displayRole),
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: SAUColors.muted, height: 1.4),
-          ),
+          Text(description, textAlign: TextAlign.center, style: const TextStyle(color: SAUColors.muted, height: 1.45, fontSize: 15)),
+          if (special == RoleType.guardian && player.knownPlayerName != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              widget.language == AppLanguage.arabic ? 'معلومة سرية: ${player.knownPlayerName}' : widget.language == AppLanguage.french ? 'Info secrète : ${player.knownPlayerName}' : 'Secret intel: ${player.knownPlayerName}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SAUColors.cyan, fontWeight: FontWeight.w800),
+            ),
+          ],
+          if (special == RoleType.lovers) ...[
+            const SizedBox(height: 12),
+            Text(
+              widget.engine.players.where((p) => p != player && p.specialRole == RoleType.lovers).map((p) => p.name).join(' ♥ '),
+              style: const TextStyle(color: SAUColors.red, fontWeight: FontWeight.w900),
+            ),
+          ],
         ],
       ),
     );
@@ -2198,9 +2211,9 @@ class _ClueScreenState extends State<ClueScreen> {
             Text(l10n.clue, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
             Text(
-              current.role == RoleType.mrWhite
-                  ? 'Listen to the other clues and bluff.'
-                  : 'Give one short clue. Do not say your secret word.',
+              current.coreRole == RoleType.mrWhite
+                  ? 'You have no word. Listen, imitate confidence, and survive.'
+                  : 'Give one precise clue. Do not say your secret word. Watch who sounds too safe.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: SAUColors.muted, fontSize: 17, height: 1.45),
             ),
@@ -2446,11 +2459,11 @@ class EliminationScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   if (p != null) Text(p.name, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  if (p != null && engine.settings.revealRoles) Text(l10n.roleName(p.role), style: const TextStyle(fontSize: 24, color: SAUColors.red, fontWeight: FontWeight.bold)),
+                  if (p != null && engine.settings.revealRoles) Text(l10n.roleName(p.coreRole), style: const TextStyle(fontSize: 24, color: SAUColors.red, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   if (engine.lastMessage != null) Text(engine.lastMessage!, textAlign: TextAlign.center, style: const TextStyle(color: SAUColors.muted, fontSize: 17)),
                   const SizedBox(height: 34),
-                  if (p?.role == RoleType.revenger && p?.active == false)
+                  if (p?.specialRole == RoleType.revenger && p?.active == false)
                     SecondaryButton(icon: Icons.flash_on_rounded, label: language == AppLanguage.arabic ? 'المنتقم يختار' : language == AppLanguage.french ? 'Le Vengeur choisit' : 'Revenger chooses', onPressed: () => _revengerDialog(context))
                   else
                     PrimaryButton(icon: Icons.arrow_forward_rounded, label: l10n.continueText, onPressed: engine.continueAfterResult),
@@ -2507,12 +2520,43 @@ class FinalScreen extends StatelessWidget {
                 const SizedBox(height: 28),
                 _scoreboard(),
                 const SizedBox(height: 24),
+                _finalIdentityPanel(),
+                const SizedBox(height: 24),
                 PrimaryButton(icon: Icons.replay_rounded, label: l10n.playAgain, onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 }),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _finalIdentityPanel() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(language == AppLanguage.arabic ? 'كشف الحقيقة' : language == AppLanguage.french ? 'Révélation finale' : 'Final Reveal', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: SAUColors.goldBright)),
+            const SizedBox(height: 12),
+            ...engine.players.map((p) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  PlayerAvatar(player: p),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800))),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(l10n.roleName(p.coreRole), style: const TextStyle(color: SAUColors.goldBright, fontWeight: FontWeight.w800)),
+                    if (p.specialRole != null) Text(l10n.roleName(p.specialRole!), style: const TextStyle(color: SAUColors.cyan, fontSize: 12)),
+                  ]),
+                ],
+              ),
+            )),
+          ],
         ),
       ),
     );
@@ -2701,7 +2745,7 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 60,
+      height: 58,
       width: double.infinity,
       child: FilledButton.icon(
         onPressed: onPressed,
@@ -2712,9 +2756,7 @@ class PrimaryButton extends StatelessWidget {
           foregroundColor: SAUColors.navy,
           disabledBackgroundColor: SAUColors.panel2,
           disabledForegroundColor: SAUColors.muted,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(19)),
-          elevation: 8,
-          shadowColor: SAUColors.gold.withOpacity(.24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
       ),
     );
@@ -2906,7 +2948,7 @@ class RoundBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(color: SAUColors.panel2, borderRadius: BorderRadius.circular(30)),
-      child: Text('ROUND $round', style: const TextStyle(color: SAUColors.gold, fontWeight: FontWeight.w900, letterSpacing: 1)),
+      child: Text('ROUND $round  •  LIVE', style: const TextStyle(color: SAUColors.gold, fontWeight: FontWeight.w900, letterSpacing: 1)),
     );
   }
 }
@@ -2985,7 +3027,7 @@ bool isEliminated(Player player) => !player.active;
 
 int countTeam(List<Player> players, TeamType team) => players.where((p) => p.active && p.team == team).length;
 
-int countRole(List<Player> players, RoleType role) => players.where((p) => p.active && p.role == role).length;
+int countRole(List<Player> players, RoleType role) => players.where((p) => p.active && (p.coreRole == role || p.specialRole == role)).length;
 
 List<Player> livingCivilians(List<Player> players) => players.where((p) => p.active && p.team == TeamType.civilian).toList();
 
@@ -2999,13 +3041,13 @@ bool hasCoreWord(Player player) => player.word.isNotEmpty;
 
 String secretWordLabel(Player player, AppLanguage language) {
   final l10n = L10n(language);
-  if (player.role == RoleType.mrWhite || player.word.isEmpty) return l10n.mrWhite;
+  if (player.coreRole == RoleType.mrWhite || player.word.isEmpty) return l10n.mrWhite;
   return player.word;
 }
 
 String roleAndTeamLabel(Player player, AppLanguage language) {
   final l10n = L10n(language);
-  return '${l10n.roleName(player.role)} • ${l10n.teamName(player.team)}';
+  return player.specialRole == null ? l10n.roleName(player.coreRole) : l10n.roleName(player.specialRole!);
 }
 
 // ---------------------------------------------------------------
