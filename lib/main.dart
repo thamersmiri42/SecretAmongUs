@@ -1921,7 +1921,6 @@ class _RevealScreenState extends State<RevealScreen>
   }
 
   Widget _card() {
-    final role = player.role;
     // Never leak the hidden core faction through card color. Only Mr. White
     // and an optional special ability get a distinct reveal color.
     final color = player.coreRole == RoleType.mrWhite
