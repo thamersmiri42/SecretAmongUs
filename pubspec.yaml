@@ -1,5 +1,7 @@
 name: secret_among_us
+
 description: Secret Among Us - offline pass-and-play social deduction game.
+
 publish_to: "none"
 
 version: 1.0.0+1
@@ -21,3 +23,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - secret_among_us_logo.png
