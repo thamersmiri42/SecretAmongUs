@@ -89,102 +89,6 @@ class GameLimits {
 }
 
 // ----------------------------------------------------------------
-// VISUAL SYSTEM
-// ----------------------------------------------------------------
-
-class SecretBackdrop extends StatelessWidget {
-  final Widget child;
-  const SecretBackdrop({super.key, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF050812), Color(0xFF0A0F1C), Color(0xFF080B14)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Stack(
-        children: [
-          const Positioned(top: -90, right: -70, child: _GlowOrb(size: 260, color: SAUColors.gold)),
-          const Positioned(bottom: -120, left: -80, child: _GlowOrb(size: 300, color: SAUColors.cyan)),
-          Positioned.fill(child: CustomPaint(painter: _NoirPatternPainter())),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _GlowOrb({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(colors: [color.withOpacity(.12), color.withOpacity(0)]),
-          ),
-        ),
-      );
-}
-
-class _NoirPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = SAUColors.gold.withOpacity(.035)..strokeWidth = 1;
-    const step = 54.0;
-    for (double x = -size.height; x < size.width + size.height; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x + size.height, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += 90) {
-      canvas.drawCircle(Offset(size.width * .5, y), 1.4, Paint()..color = SAUColors.gold.withOpacity(.07));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class SecretPageRoute<T> extends PageRouteBuilder<T> {
-  SecretPageRoute({required WidgetBuilder builder})
-      : super(
-          transitionDuration: const Duration(milliseconds: 520),
-          reverseTransitionDuration: const Duration(milliseconds: 360),
-          pageBuilder: (context, animation, secondaryAnimation) => builder(context),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-            final slide = Tween<Offset>(begin: const Offset(0, .035), end: Offset.zero).animate(curved);
-            final scale = Tween<double>(begin: .97, end: 1).animate(curved);
-            return FadeTransition(opacity: curved, child: SlideTransition(position: slide, child: ScaleTransition(scale: scale, child: child)));
-          },
-        );
-}
-
-class SecretPageTransitionBuilder extends PageTransitionsBuilder {
-  const SecretPageTransitionBuilder();
-
-  @override
-  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(.02, .02), end: Offset.zero).animate(curved),
-        child: child,
-      ),
-    );
-  }
-}
-
-// ----------------------------------------------------------------
 // LOCALIZED TEXT
 // ----------------------------------------------------------------
 
@@ -206,6 +110,8 @@ class L10n {
   String get reveal => ar ? 'اكشف بطاقتي' : fr ? 'Révéler ma carte' : 'Reveal My Card';
   String get hide => ar ? 'أخفِ البطاقة' : fr ? 'Masquer' : 'Hide Card';
   String get passPhone => ar ? 'مرّر الهاتف' : fr ? 'Passez le téléphone' : 'Pass the Phone';
+  String get readyForNext => ar ? 'أنا جاهز — افتح بطاقتي' : fr ? 'Je suis prêt — ouvrir ma carte' : 'I'm ready — show my card';
+  String get handPhoneTo => ar ? 'سلّم الهاتف إلى' : fr ? 'Passez le téléphone à' : 'Hand the phone to';
   String get clue => ar ? 'جولة الوصف' : fr ? 'Tour des indices' : 'Clue Round';
   String get discussion => ar ? 'النقاش' : fr ? 'Discussion' : 'Discussion';
   String get vote => ar ? 'التصويت' : fr ? 'Vote' : 'Vote';
@@ -1243,16 +1149,6 @@ class _SecretAmongUsAppState extends State<SecretAmongUsApp> {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: SecretPageTransitionBuilder(),
-          TargetPlatform.iOS: SecretPageTransitionBuilder(),
-          TargetPlatform.linux: SecretPageTransitionBuilder(),
-          TargetPlatform.macOS: SecretPageTransitionBuilder(),
-          TargetPlatform.windows: SecretPageTransitionBuilder(),
-          TargetPlatform.fuchsia: SecretPageTransitionBuilder(),
-        },
-      ),
     );
   }
 }
@@ -1280,75 +1176,69 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SecretBackdrop(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
-                children: [
-                  _logo(),
-                  const SizedBox(height: 18),
-                  Text(
-                    l10n.appName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: SAUColors.goldBright,
-                      fontSize: 40,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.4,
-                      shadows: [Shadow(color: SAUColors.gold, blurRadius: 18)],
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const SizedBox(height: 30),
+                _logo(),
+                const SizedBox(height: 30),
+                Text(
+                  l10n.appName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: SAUColors.goldBright,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.noInternet,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: SAUColors.muted),
+                ),
+                const SizedBox(height: 42),
+                PrimaryButton(
+                  icon: Icons.play_arrow_rounded,
+                  label: l10n.newGame,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SetupScreen(engine: engine, language: language),
                     ),
                   ),
-                  const SizedBox(height: 7),
-                  Text(
-                    l10n.noInternet,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: SAUColors.muted, fontSize: 14),
-                  ),
-                  const SizedBox(height: 34),
-                  PrimaryButton(
-                    icon: Icons.play_arrow_rounded,
-                    label: l10n.newGame,
-                    onPressed: () => Navigator.of(context).push(
-                      SecretPageRoute(builder: (_) => SetupScreen(engine: engine, language: language)),
+                ),
+                const SizedBox(height: 14),
+                SecondaryButton(
+                  icon: Icons.menu_book_rounded,
+                  label: l10n.roleGuide,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RoleGuideScreen(language: language),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SecondaryButton(
-                          icon: Icons.auto_awesome_rounded,
-                          label: l10n.roleGuide,
-                          onPressed: () => Navigator.of(context).push(
-                            SecretPageRoute(builder: (_) => RoleGuideScreen(language: language)),
-                          ),
-                        ),
+                ),
+                const SizedBox(height: 14),
+                SecondaryButton(
+                  icon: Icons.settings_rounded,
+                  label: l10n.settings,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SettingsScreen(
+                        language: language,
+                        onLanguage: onLanguage,
+                        onTheme: onTheme,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SecondaryButton(
-                          icon: Icons.settings_rounded,
-                          label: l10n.settings,
-                          onPressed: () => Navigator.of(context).push(
-                            SecretPageRoute(
-                              builder: (_) => SettingsScreen(
-                                language: language,
-                                onLanguage: onLanguage,
-                                onTheme: onTheme,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 28),
-                  _coreInfo(),
-                ],
-              ),
+                ),
+                const SizedBox(height: 24),
+                _coreInfo(),
+              ],
             ),
           ),
         ),
@@ -1361,17 +1251,33 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         width: 190,
         height: 190,
-        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(48),
           boxShadow: [
-            BoxShadow(color: SAUColors.gold.withOpacity(.16), blurRadius: 45, spreadRadius: 6),
-            BoxShadow(color: SAUColors.cyan.withOpacity(.06), blurRadius: 70, spreadRadius: 12),
+            BoxShadow(
+              color: SAUColors.gold.withOpacity(.22),
+              blurRadius: 42,
+              spreadRadius: 4,
+            ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(42),
-          child: Image.asset('assets/images/secret_among_us_logo.png', fit: BoxFit.cover),
+          borderRadius: BorderRadius.circular(48),
+          child: Image.asset(
+            'ChatGPT Image 27 sept. 2026, 18_03_02.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(48),
+                gradient: const LinearGradient(
+                  colors: [SAUColors.panel2, SAUColors.navy],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: const Icon(Icons.visibility_rounded, size: 86, color: SAUColors.goldBright),
+            ),
+          ),
         ),
       ),
     );
@@ -1442,19 +1348,13 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   void dispose() {
-    for (final c in controllers) {
-      c.dispose();
-    }
+    for (final c in controllers) c.dispose();
     super.dispose();
   }
 
   void _resizeControllers(int count) {
-    while (controllers.length < count) {
-      controllers.add(TextEditingController(text: _defaultName(controllers.length)));
-    }
-    while (controllers.length > count) {
-      controllers.removeLast().dispose();
-    }
+    while (controllers.length < count) controllers.add(TextEditingController(text: _defaultName(controllers.length)));
+    while (controllers.length > count) controllers.removeLast().dispose();
     setState(() {});
   }
 
@@ -1679,7 +1579,7 @@ class _SetupScreenState extends State<SetupScreen> {
     widget.engine.settings.anonymousVote = anonymous;
     widget.engine.settings.revealRoles = revealRoles;
     widget.engine.startGame();
-    Navigator.of(context).pushReplacement(SecretPageRoute(builder: (_) => GameScreen(engine: widget.engine, language: widget.language)));
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GameScreen(engine: widget.engine, language: widget.language)));
   }
 }
 
@@ -1697,50 +1597,24 @@ class GameScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: engine,
       builder: (context, _) {
-        Widget screen;
         switch (engine.phase) {
           case GamePhase.reveal:
-            screen = RevealScreen(engine: engine, language: language);
-            break;
+            return RevealScreen(engine: engine, language: language);
           case GamePhase.clues:
-            screen = ClueScreen(engine: engine, language: language);
-            break;
+            return ClueScreen(engine: engine, language: language);
           case GamePhase.discussion:
-            screen = DiscussionScreen(engine: engine, language: language);
-            break;
+            return DiscussionScreen(engine: engine, language: language);
           case GamePhase.voting:
-            screen = VotingScreen(engine: engine, language: language);
-            break;
+            return VotingScreen(engine: engine, language: language);
           case GamePhase.mrWhiteGuess:
-            screen = MrWhiteGuessScreen(engine: engine, language: language);
-            break;
+            return MrWhiteGuessScreen(engine: engine, language: language);
           case GamePhase.result:
-            screen = EliminationScreen(engine: engine, language: language);
-            break;
+            return EliminationScreen(engine: engine, language: language);
           case GamePhase.finished:
-            screen = FinalScreen(engine: engine, language: language);
-            break;
+            return FinalScreen(engine: engine, language: language);
           case GamePhase.setup:
-            screen = SetupScreen(engine: engine, language: language);
-            break;
+            return SetupScreen(engine: engine, language: language);
         }
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 520),
-          reverseDuration: const Duration(milliseconds: 260),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-            return FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: .975, end: 1).animate(curved),
-                child: child,
-              ),
-            );
-          },
-          child: KeyedSubtree(key: ValueKey(engine.phase), child: screen),
-        );
       },
     );
   }
@@ -1759,16 +1633,36 @@ class RevealScreen extends StatefulWidget {
   State<RevealScreen> createState() => _RevealScreenState();
 }
 
-class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderStateMixin {
+class _RevealScreenState extends State<RevealScreen>
+    with SingleTickerProviderStateMixin {
   bool revealed = false;
-  late AnimationController flip;
+  bool waitingToPass = false;
+  late final AnimationController flip;
+  int lastRevealIndex = -1;
+
   L10n get l10n => L10n(widget.language);
   Player get player => widget.engine.currentRevealPlayer;
 
   @override
   void initState() {
     super.initState();
-    flip = AnimationController(vsync: this, duration: const Duration(milliseconds: 720));
+    lastRevealIndex = widget.engine.revealIndex;
+    flip = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant RevealScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.engine.revealIndex != widget.engine.revealIndex) {
+      lastRevealIndex = widget.engine.revealIndex;
+      revealed = false;
+      waitingToPass = false;
+      flip.value = 0;
+      widget.engine.stopTimer();
+    }
   }
 
   @override
@@ -1779,103 +1673,196 @@ class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderSt
   }
 
   void reveal() {
-    widget.engine.stopTimer();
-    setState(() => revealed = true);
+    if (revealed || waitingToPass) return;
+    setState(() {
+      revealed = true;
+      waitingToPass = false;
+    });
     flip.forward(from: 0);
     widget.engine.startTimer(widget.engine.settings.revealSeconds, () {
       if (!mounted) return;
-      setState(() => revealed = false);
-      flip.reverse();
+      _hideCard();
     });
   }
 
-  void hideCard() {
+  void _hideCard() {
     widget.engine.stopTimer();
-    setState(() => revealed = false);
+    if (!mounted) return;
+    setState(() {
+      revealed = false;
+      waitingToPass = true;
+    });
     flip.reverse();
   }
 
-  void passToNext() {
+  void _readyForNext() {
+    if (!waitingToPass) return;
     widget.engine.stopTimer();
-    flip.reset();
-    setState(() => revealed = false);
     widget.engine.finishReveal();
   }
 
   @override
   Widget build(BuildContext context) {
     final progress = (widget.engine.revealIndex + 1) / widget.engine.players.length;
+    final isLast = widget.engine.revealIndex == widget.engine.players.length - 1;
+
     return Scaffold(
-      body: SecretBackdrop(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_rounded)),
-                    Expanded(
-                      child: Text(
-                        '${l10n.passPhone}  •  ${widget.engine.revealIndex + 1}/${widget.engine.players.length}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
+      appBar: AppBar(
+        title: Text('${l10n.passPhone} ${widget.engine.revealIndex + 1}/${widget.engine.players.length}'),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  minHeight: 7,
+                  value: progress,
+                  color: SAUColors.gold,
+                  backgroundColor: SAUColors.panel,
                 ),
-                const SizedBox(height: 5),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 7,
+              ),
+              const SizedBox(height: 28),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 350),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(scale: animation, child: child),
+                ),
+                child: Text(
+                  waitingToPass ? l10n.handPhoneTo : player.name,
+                  key: ValueKey('${widget.engine.revealIndex}-$waitingToPass'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
                     color: SAUColors.goldBright,
-                    backgroundColor: SAUColors.panel,
                   ),
                 ),
-                const SizedBox(height: 26),
-                Text(player.name, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: SAUColors.goldBright)),
-                const SizedBox(height: 6),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: Text(
-                    revealed ? 'Keep this secret.' : l10n.passPhone,
-                    key: ValueKey(revealed),
-                    style: const TextStyle(color: SAUColors.muted, fontSize: 15),
+              ),
+              if (waitingToPass) ...[
+                const SizedBox(height: 8),
+                Text(
+                  isLast ? l10n.players : widget.engine.players[widget.engine.revealIndex + 1].name,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: SAUColors.text,
                   ),
                 ),
-                const SizedBox(height: 20),
-                Expanded(child: Center(child: _card())),
-                if (revealed && widget.engine.turnSeconds > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _CountdownPill(seconds: widget.engine.turnSeconds),
-                  ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  child: !revealed
-                      ? Column(
-                          key: const ValueKey('reveal-actions'),
-                          children: [
-                            PrimaryButton(icon: Icons.visibility_rounded, label: l10n.reveal, onPressed: reveal),
-                            const SizedBox(height: 10),
-                            Text('Tap once. Memorize it. Keep it secret.', style: const TextStyle(color: SAUColors.muted, fontSize: 12)),
-                          ],
-                        )
-                      : Row(
-                          key: const ValueKey('shown-actions'),
-                          children: [
-                            Expanded(child: SecondaryButton(icon: Icons.visibility_off_rounded, label: l10n.hide, onPressed: hideCard)),
-                            const SizedBox(width: 10),
-                            Expanded(child: PrimaryButton(icon: Icons.arrow_forward_rounded, label: l10n.passPhone, onPressed: passToNext)),
-                          ],
-                        ),
+                const SizedBox(height: 8),
+                Text(
+                  isLast ? l10n.continueText : l10n.readyForNext,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: SAUColors.muted),
+                ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Text(
+                  revealed ? 'Keep this secret.' : l10n.passPhone,
+                  style: const TextStyle(color: SAUColors.muted),
                 ),
               ],
-            ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(scale: animation, child: child),
+                  ),
+                  child: waitingToPass
+                      ? _passPanel(isLast)
+                      : Center(child: _card()),
+                ),
+              ),
+              if (!waitingToPass && revealed && widget.engine.turnSeconds > 0)
+                Text(
+                  '${widget.engine.turnSeconds}',
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: SAUColors.gold,
+                  ),
+                ),
+              const SizedBox(height: 16),
+              if (waitingToPass)
+                PrimaryButton(
+                  icon: isLast ? Icons.play_arrow_rounded : Icons.phone_forwarded_rounded,
+                  label: isLast ? l10n.continueText : l10n.readyForNext,
+                  onPressed: _readyForNext,
+                )
+              else if (!revealed)
+                PrimaryButton(
+                  icon: Icons.flip_rounded,
+                  label: l10n.reveal,
+                  onPressed: reveal,
+                )
+              else
+                SecondaryButton(
+                  icon: Icons.visibility_off_rounded,
+                  label: l10n.hide,
+                  onPressed: _hideCard,
+                ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _passPanel(bool isLast) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 480),
+        padding: const EdgeInsets.all(30),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          gradient: const LinearGradient(
+            colors: [SAUColors.panel2, SAUColors.panel],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(color: SAUColors.gold.withOpacity(.38)),
+          boxShadow: [
+            BoxShadow(
+              color: SAUColors.gold.withOpacity(.10),
+              blurRadius: 40,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.phone_forwarded_rounded,
+              size: 76,
+              color: SAUColors.goldBright,
+            ),
+            const SizedBox(height: 22),
+            Text(
+              isLast ? '✓' : 'PASS',
+              style: const TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                color: SAUColors.goldBright,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isLast ? l10n.continueText : l10n.handPhoneTo,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: SAUColors.text,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1888,19 +1875,14 @@ class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderSt
       animation: flip,
       builder: (context, child) {
         final angle = flip.value * pi;
-        final showingFront = angle >= pi / 2;
-        Widget face = showingFront ? _front(color) : _back();
-        if (showingFront) {
-          face = Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.identity()..rotateY(pi),
-            child: face,
-          );
-        }
+        final showFront = angle > pi / 2;
+        final visibleAngle = showFront ? angle - pi : angle;
         return Transform(
           alignment: Alignment.center,
-          transform: Matrix4.identity()..setEntry(3, 2, .0014)..rotateY(angle),
-          child: face,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, .0012)
+            ..rotateY(visibleAngle),
+          child: showFront ? _front(color) : _back(),
         );
       },
     );
@@ -1908,89 +1890,119 @@ class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderSt
 
   Widget _back() {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 480, minHeight: 380),
+      constraints: const BoxConstraints(maxWidth: 480, minHeight: 360),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(36),
-        gradient: const LinearGradient(colors: [Color(0xFF1D2740), Color(0xFF0D1220)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        border: Border.all(color: SAUColors.gold.withOpacity(.72), width: 1.7),
-        boxShadow: [BoxShadow(color: SAUColors.gold.withOpacity(.12), blurRadius: 38, spreadRadius: 2)],
+        borderRadius: BorderRadius.circular(34),
+        gradient: const LinearGradient(
+          colors: [SAUColors.panel2, SAUColors.navy],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: SAUColors.gold.withOpacity(.70), width: 1.8),
+        boxShadow: [
+          BoxShadow(
+            color: SAUColors.gold.withOpacity(.14),
+            blurRadius: 34,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: Stack(
+        alignment: Alignment.center,
         children: [
-          Positioned(top: 22, left: 22, child: _cornerMark()),
-          Positioned(bottom: 22, right: 22, child: Transform.rotate(angle: pi, child: _cornerMark())),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 112,
-                  height: 112,
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: SAUColors.gold.withOpacity(.6), width: 1.5),
-                    boxShadow: [BoxShadow(color: SAUColors.gold.withOpacity(.12), blurRadius: 28)],
-                  ),
-                  child: ClipOval(child: Image.asset('assets/images/secret_among_us_logo.png', fit: BoxFit.cover)),
+          Positioned.fill(
+            child: CustomPaint(painter: _CardPatternPainter()),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.visibility_off_rounded, size: 74, color: SAUColors.gold),
+              SizedBox(height: 18),
+              Text(
+                'SECRET',
+                style: TextStyle(
+                  color: SAUColors.goldBright,
+                  fontSize: 27,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 6,
                 ),
-                const SizedBox(height: 22),
-                Text('SECRET', style: TextStyle(color: SAUColors.goldBright.withOpacity(.95), fontWeight: FontWeight.w900, letterSpacing: 5, fontSize: 18)),
-                const SizedBox(height: 5),
-                Text('KEEP IT HIDDEN', style: TextStyle(color: SAUColors.muted.withOpacity(.9), letterSpacing: 2.2, fontSize: 11, fontWeight: FontWeight.w700)),
-              ],
-            ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Tap to reveal',
+                style: TextStyle(color: SAUColors.muted, fontSize: 15),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _cornerMark() => const Icon(Icons.diamond_rounded, color: SAUColors.gold, size: 22);
-
   Widget _front(Color color) {
     final core = widget.engine.underlyingRole(player);
     final displayRole = player.role;
     final word = player.word.isEmpty ? '—' : player.word;
     return Container(
-      constraints: const BoxConstraints(maxWidth: 480, minHeight: 380),
-      padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
+      constraints: const BoxConstraints(maxWidth: 480, minHeight: 360),
+      padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(36),
-        gradient: LinearGradient(colors: [SAUColors.panel2, SAUColors.panel], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(34),
+        gradient: const LinearGradient(
+          colors: [SAUColors.panel2, SAUColors.panel],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         border: Border.all(color: color, width: 2),
-        boxShadow: [BoxShadow(color: color.withOpacity(.24), blurRadius: 34, spreadRadius: 1)],
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(.22), blurRadius: 34, spreadRadius: 2),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.10), border: Border.all(color: color.withOpacity(.45))),
-            child: Icon(_roleIcon(displayRole), size: 43, color: color),
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(.10),
+              border: Border.all(color: color.withOpacity(.55)),
+              boxShadow: [BoxShadow(color: color.withOpacity(.16), blurRadius: 22)],
+            ),
+            child: Icon(_roleIcon(displayRole), size: 48, color: color),
           ),
-          const SizedBox(height: 15),
-          Text(l10n.roleName(displayRole), textAlign: TextAlign.center, style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900, color: color)),
+          const SizedBox(height: 18),
+          Text(
+            l10n.roleName(displayRole),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: color),
+          ),
           if (displayRole != core) ...[
-            const SizedBox(height: 5),
-            Text('Core: ${l10n.roleName(core)}', style: const TextStyle(color: SAUColors.muted, fontSize: 12)),
+            const SizedBox(height: 7),
+            Text('Core: ${l10n.roleName(core)}', style: const TextStyle(color: SAUColors.muted)),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-            decoration: BoxDecoration(color: Colors.black.withOpacity(.14), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.18))),
-            child: Column(
-              children: [
-                const Text('YOUR SECRET WORD', style: TextStyle(color: SAUColors.muted, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.8)),
-                const SizedBox(height: 7),
-                Text(word, textAlign: TextAlign.center, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: SAUColors.text)),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: SAUColors.navy.withOpacity(.55),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: color.withOpacity(.20)),
+            ),
+            child: Text(
+              word,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900, color: SAUColors.text),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(l10n.roleDescription(displayRole), textAlign: TextAlign.center, style: const TextStyle(color: SAUColors.muted, height: 1.35, fontSize: 13)),
+          const SizedBox(height: 18),
+          Text(
+            l10n.roleDescription(displayRole),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: SAUColors.muted, height: 1.4),
+          ),
         ],
       ),
     );
@@ -2026,18 +2038,24 @@ class _RevealScreenState extends State<RevealScreen> with SingleTickerProviderSt
   }
 }
 
-class _CountdownPill extends StatelessWidget {
-  final int seconds;
-  const _CountdownPill({required this.seconds});
+class _CardPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = SAUColors.gold.withOpacity(.10);
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxR = min(size.width, size.height) * .42;
+    for (int i = 1; i <= 5; i++) {
+      canvas.drawCircle(center, maxR * i / 5, paint);
+    }
+    canvas.drawLine(Offset(size.width * .18, size.height * .18), Offset(size.width * .82, size.height * .82), paint);
+    canvas.drawLine(Offset(size.width * .82, size.height * .18), Offset(size.width * .18, size.height * .82), paint);
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      decoration: BoxDecoration(color: SAUColors.gold.withOpacity(.10), borderRadius: BorderRadius.circular(30), border: Border.all(color: SAUColors.gold.withOpacity(.30))),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.timer_rounded, size: 17, color: SAUColors.goldBright), const SizedBox(width: 7), Text('$seconds', style: const TextStyle(color: SAUColors.goldBright, fontWeight: FontWeight.w900))]),
-    );
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ----------------------------------------------------------------
