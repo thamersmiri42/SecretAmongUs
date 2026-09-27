@@ -1264,7 +1264,7 @@ class HomeScreen extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(48),
           child: Image.asset(
-            'ChatGPT Image 27 sept. 2026, 18_03_02.png',
+            'secret_among_us_logo.png',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               decoration: BoxDecoration(
@@ -1924,9 +1924,9 @@ class _RevealScreenState extends State<RevealScreen>
           Positioned.fill(
             child: CustomPaint(painter: _CardPatternPainter()),
           ),
-          Column(
+          const Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(Icons.visibility_off_rounded, size: 74, color: SAUColors.gold),
               SizedBox(height: 18),
               Text(
