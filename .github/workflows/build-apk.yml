@@ -3,31 +3,25 @@ name: Build Secret Among Us APK
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
     name: Analyze, Test and Build APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.24.5"
           channel: stable
           cache: true
-
       - name: Flutter doctor
         run: flutter doctor -v
-
       - name: Generate Android project
         run: |
           flutter create \
@@ -35,28 +29,20 @@ jobs:
             --project-name secret_among_us \
             --org com.secretamongus \
             .
-
       - name: Get dependencies
         run: flutter pub get
-
       - name: Analyze
         run: flutter analyze
-
       - name: Run Flutter tests
         run: flutter test
-
       - name: Build release APK
         run: flutter build apk --release
-
       - name: Verify APK
         shell: bash
         run: |
           test -f build/app/outputs/flutter-apk/app-release.apk
-          echo "========================================"
           echo "APK BUILD SUCCESSFUL"
-          echo "========================================"
           ls -lh build/app/outputs/flutter-apk/app-release.apk
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
