@@ -2,17 +2,30 @@ name: Build Secret Among Us APK
 
 on:
   workflow_dispatch:
+
   push:
+    branches:
+      - main
+
+  pull_request:
     branches:
       - main
 
 jobs:
   build:
+    name: Analyze, Test and Build APK
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      # ------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------
+      # Flutter
+      # ------------------------------------------------------------
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -20,18 +33,54 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create Android project
-        run: flutter create --platforms=android --project-name secret_among_us .
+      # ------------------------------------------------------------
+      # Flutter doctor
+      # ------------------------------------------------------------
+      - name: Flutter doctor
+        run: flutter doctor -v
 
+      # ------------------------------------------------------------
+      # Dependencies
+      # ------------------------------------------------------------
       - name: Get dependencies
         run: flutter pub get
 
+      # ------------------------------------------------------------
+      # Format check
+      # ------------------------------------------------------------
+      - name: Check Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      # ------------------------------------------------------------
+      # Static analysis
+      # ------------------------------------------------------------
       - name: Analyze
         run: flutter analyze
 
+      # ------------------------------------------------------------
+      # Automated tests
+      # ------------------------------------------------------------
+      - name: Run Flutter tests
+        run: flutter test
+
+      # ------------------------------------------------------------
+      # Build release APK
+      # ------------------------------------------------------------
       - name: Build release APK
         run: flutter build apk --release
 
+      # ------------------------------------------------------------
+      # Verify APK exists
+      # ------------------------------------------------------------
+      - name: Verify APK
+        shell: bash
+        run: |
+          test -f build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
+
+      # ------------------------------------------------------------
+      # Upload APK
+      # ------------------------------------------------------------
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
