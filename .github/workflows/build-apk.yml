@@ -1,109 +1,28 @@
-name: Build Secret Among Us APK
+name: secret_among_us
 
-on:
-  workflow_dispatch:
+description: Secret Among Us - offline pass-and-play social deduction game.
 
-  push:
-    branches:
-      - main
+publish_to: "none"
 
-  pull_request:
-    branches:
-      - main
+version: 1.0.0+1
 
-jobs:
-  build:
-    name: Analyze, Test and Build APK
-    runs-on: ubuntu-latest
+environment:
+  sdk: ">=3.5.0 <4.0.0"
 
-    steps:
+dependencies:
+  flutter:
+    sdk: flutter
 
-      # ------------------------------------------------------------
-      # Checkout repository
-      # ------------------------------------------------------------
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  shared_preferences: ^2.3.2
 
-      # ------------------------------------------------------------
-      # Setup Flutter
-      # ------------------------------------------------------------
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.5"
-          channel: stable
-          cache: true
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
 
-      # ------------------------------------------------------------
-      # Flutter information
-      # ------------------------------------------------------------
-      - name: Flutter doctor
-        run: flutter doctor -v
+  flutter_lints: ^4.0.0
 
-      # ------------------------------------------------------------
-      # Generate the Android project
-      #
-      # The repository contains the Flutter/Dart application,
-      # but Android Gradle files are not committed.
-      #
-      # This creates:
-      # android/
-      # android/app/
-      # android/gradle/
-      # AndroidManifest.xml
-      # Gradle configuration
-      # ------------------------------------------------------------
-      - name: Generate Android project
-        run: |
-          flutter create \
-            --platforms=android \
-            --project-name secret_among_us \
-            --org com.secretamongus \
-            .
+flutter:
+  uses-material-design: true
 
-      # ------------------------------------------------------------
-      # Get dependencies
-      # ------------------------------------------------------------
-      - name: Get dependencies
-        run: flutter pub get
-
-      # ------------------------------------------------------------
-      # Analyze Dart code
-      # ------------------------------------------------------------
-      - name: Analyze
-        run: flutter analyze
-
-      # ------------------------------------------------------------
-      # Run tests
-      # ------------------------------------------------------------
-      - name: Run Flutter tests
-        run: flutter test
-
-      # ------------------------------------------------------------
-      # Build release APK
-      # ------------------------------------------------------------
-      - name: Build release APK
-        run: flutter build apk --release
-
-      # ------------------------------------------------------------
-      # Verify APK
-      # ------------------------------------------------------------
-      - name: Verify APK
-        shell: bash
-        run: |
-          test -f build/app/outputs/flutter-apk/app-release.apk
-
-          echo "========================================"
-          echo "APK BUILD SUCCESSFUL"
-          echo "========================================"
-
-          ls -lh build/app/outputs/flutter-apk/app-release.apk
-
-      # ------------------------------------------------------------
-      # Upload APK
-      # ------------------------------------------------------------
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SecretAmongUs-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+  assets:
+    - secret_among_us_logo.png
