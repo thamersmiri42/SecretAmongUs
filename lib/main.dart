@@ -1176,73 +1176,101 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                const SizedBox(height: 30),
-                _logo(),
-                const SizedBox(height: 30),
-                Text(
-                  l10n.appName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: SAUColors.goldBright,
-                    fontSize: 38,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.noInternet,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: SAUColors.muted),
-                ),
-                const SizedBox(height: 42),
-                PrimaryButton(
-                  icon: Icons.play_arrow_rounded,
-                  label: l10n.newGame,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SetupScreen(engine: engine, language: language),
+      body: Stack(
+        children: [
+          Positioned.fill(child: _ambientBackground()),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: ListView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 34),
+                  children: [
+                    Align(alignment: AlignmentDirectional.topEnd, child: _offlineBadge()),
+                    const SizedBox(height: 8),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: .92, end: 1),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOutBack,
+                      builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                      child: _logo(),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SecondaryButton(
-                  icon: Icons.menu_book_rounded,
-                  label: l10n.roleGuide,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RoleGuideScreen(language: language),
+                    const SizedBox(height: 22),
+                    Text(
+                      l10n.appName,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: SAUColors.goldBright, fontSize: 40, height: 1, fontWeight: FontWeight.w900, letterSpacing: 1.2),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SecondaryButton(
-                  icon: Icons.settings_rounded,
-                  label: l10n.settings,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SettingsScreen(
-                        language: language,
-                        onLanguage: onLanguage,
-                        onTheme: onTheme,
-                      ),
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.noInternet,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: SAUColors.muted, fontSize: 15, height: 1.4),
                     ),
-                  ),
+                    const SizedBox(height: 28),
+                    _heroPanel(),
+                    const SizedBox(height: 18),
+                    PrimaryButton(
+                      icon: Icons.play_arrow_rounded,
+                      label: l10n.newGame,
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SetupScreen(engine: engine, language: language))),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: SecondaryButton(icon: Icons.menu_book_rounded, label: l10n.roleGuide, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RoleGuideScreen(language: language))))),
+                        const SizedBox(width: 12),
+                        Expanded(child: SecondaryButton(icon: Icons.settings_rounded, label: l10n.settings, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(language: language, onLanguage: onLanguage, onTheme: onTheme))))),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _coreInfo(),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                _coreInfo(),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _ambientBackground() {
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [SAUColors.navy2, SAUColors.navy])),
+      child: Stack(children: [
+        Positioned(top: -110, right: -80, child: _glowOrb(250, SAUColors.gold)),
+        Positioned(top: 330, left: -140, child: _glowOrb(300, SAUColors.cyan)),
+      ]),
+    );
+  }
+
+  Widget _glowOrb(double size, Color color) {
+    return IgnorePointer(child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.035), boxShadow: [BoxShadow(color: color.withOpacity(.07), blurRadius: 90, spreadRadius: 25)])));
+  }
+
+  Widget _offlineBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: SAUColors.panel.withOpacity(.82), borderRadius: BorderRadius.circular(99), border: Border.all(color: SAUColors.green.withOpacity(.30))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 7, height: 7, decoration: const BoxDecoration(color: SAUColors.green, shape: BoxShape.circle)),
+        const SizedBox(width: 7),
+        Text(l10n.noInternet, style: const TextStyle(color: SAUColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  Widget _heroPanel() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [SAUColors.panel2, SAUColors.panel], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(26), border: Border.all(color: SAUColors.gold.withOpacity(.16)), boxShadow: [BoxShadow(color: Colors.black.withOpacity(.22), blurRadius: 28, offset: const Offset(0, 12))]),
+      child: Row(children: [
+        Container(width: 52, height: 52, decoration: BoxDecoration(color: SAUColors.gold.withOpacity(.10), borderRadius: BorderRadius.circular(17), border: Border.all(color: SAUColors.gold.withOpacity(.22))), child: const Icon(Icons.groups_rounded, color: SAUColors.goldBright, size: 27)),
+        const SizedBox(width: 14),
+        Expanded(child: Text(localizedInstruction(language, 'مرّر الهاتف، اكشف دورك، ثم أخفِ البطاقة قبل تمريرها للاعب التالي.', 'Passez le téléphone, révélez votre rôle, puis masquez la carte avant de le passer au joueur suivant.', 'Pass the phone, reveal your role, then hide the card before handing it to the next player.'), style: const TextStyle(color: SAUColors.text, height: 1.45, fontSize: 14, fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 
@@ -1253,6 +1281,7 @@ class HomeScreen extends StatelessWidget {
         height: 190,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(48),
+          border: Border.all(color: SAUColors.gold.withOpacity(.28), width: 1),
           boxShadow: [
             BoxShadow(
               color: SAUColors.gold.withOpacity(.22),
@@ -2672,7 +2701,7 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 58,
+      height: 60,
       width: double.infinity,
       child: FilledButton.icon(
         onPressed: onPressed,
@@ -2683,7 +2712,9 @@ class PrimaryButton extends StatelessWidget {
           foregroundColor: SAUColors.navy,
           disabledBackgroundColor: SAUColors.panel2,
           disabledForegroundColor: SAUColors.muted,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(19)),
+          elevation: 8,
+          shadowColor: SAUColors.gold.withOpacity(.24),
         ),
       ),
     );
